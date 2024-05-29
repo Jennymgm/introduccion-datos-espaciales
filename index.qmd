@@ -1,0 +1,355 @@
+---
+title: "Introducción al manejo de datos geoespaciales en R"
+author: "Jenny Gonzalez"
+format: html
+---
+
+# Datos vectoriales
+
+## Carga de paquetes
+
+```{r}
+#| label: carga-paquetes-vectoriales
+
+library(sf)
+library(leaflet)
+library(leaflet.extras)
+library(leafem)
+library(terra)
+```
+
+## Carga de datos
+
+```{r}
+#| label: carga-datos-vectoriales
+
+# Provincias
+provincias <-
+  st_read("provincias.geojson")
+
+# Registros de presencia de félidos
+felidos <-
+  st_read(
+    "felidos.csv",
+    options = c(
+      "X_POSSIBLE_NAMES=decimalLongitude", # columna de longitud decimal
+      "Y_POSSIBLE_NAMES=decimalLatitude"   # columna de latitud decimal
+    ),
+    quiet = TRUE
+  )
+```
+
+## Sistemas de coordenadas (CRS/SRS)
+
+```{r}
+#| label: crs
+
+# Asignación de un CRS al objeto felidos
+st_crs(felidos) <- 4326
+
+# Transformación del CRS del objeto provincias a WGS84 (EPSG = 4326)
+provincias <-
+  provincias |>
+  st_transform(4326)
+```
+
+## Mapeo
+
+```{r}
+#| label: mapeo-provinvias
+
+plot(provincias$geometry)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+#| label: mapeo-provinvias-02
+
+plot(provincias$geometry,
+     extent = st_bbox(c(xmin = -86.0, xmax = -82.3, ymin = 8.0, ymax = 11.3)),
+  main = "Provincias de Costa Rica",
+  axes = TRUE,
+  graticule = TRUE
+)
+```
+
+```{r}
+#| label: mapeo-provinvias-felidos
+
+# Primera capa del mapa
+plot(
+  provincias$geometry,
+  extent = st_bbox(c(xmin = -86.0, xmax = -82.3, ymin = 8.0, ymax = 11.3)),
+  main = "Registros de presencia de félidos en Costa Rica",
+  axes = TRUE,
+  graticule = TRUE,
+  reset = FALSE
+)
+
+# Segunda capa
+plot(felidos$geometry,
+     add = TRUE,     
+     pch = 16,
+     col = "blue")
+```
+
+## Escritura
+Se pueden ver con QGIS, el delete es para sobreescribir
+
+```{r}
+#| label: escritura
+#| eval: FALSE
+
+# Escritura del objeto provincias en formato GPKG
+provincias |>
+  st_write("provincias.gpkg", delete_dsn = TRUE)
+
+# Escritura del objeto felidos en formato KML
+felidos |>
+  st_write("felidos.shp", delete_dsn = TRUE)
+```
+
+## Mapa Leaflet
+
+```{r}
+#| label: mapa-leaflet-vectorial
+
+# Mapa leaflet básico de provincias y registros de presencia de félidos
+leaflet() |>
+  setView(# centro y nivel inicial de acercamiento
+    lng = -84.19452,
+    lat = 9.572735,
+    zoom = 7) |>
+  addTiles(group = "Mapa general (OpenStreetMap)") |>
+  addProviderTiles(
+    providers$Esri.WorldImagery, 
+    group = "Imágenes satelitales (ESRI World Imagery)"
+  ) |>  
+   addProviderTiles(
+    providers$OpenTopoMap, 
+    group = "Mapa Topográfico"
+  ) |>  
+  addPolygons(
+    # capa de provincias (polígonos)
+    data = provincias,
+    color = "black",
+    fillColor = "transparent",
+    stroke = TRUE,
+    weight = 1.0,
+    group = "Provincias"
+  ) |>
+  addCircleMarkers(
+    # capa de registros de presencia (puntos)
+    data = felidos,
+    stroke = F,
+    radius = 4,
+    fillColor = 'blue',
+    fillOpacity = 1,
+    popup = paste(
+      paste0("<strong>Especie: </strong>", felidos$species),
+      paste0("<strong>Localidad: </strong>", felidos$locality),
+      paste0("<strong>Fecha: </strong>", felidos$eventDate),
+      paste0("<strong>Fuente: </strong>", felidos$institutionCode),
+      paste0("<a href='", felidos$occurrenceID, "'>Más información</a>"),
+      sep = '<br/>'
+    ),
+    group = "Félidos"
+  ) |>
+  addLayersControl(
+    baseGroups = c(
+      "Mapa general (OpenStreetMap)", 
+      "Imágenes satelitales (ESRI World Imagery)", "Mapa Topográfico"
+    ),
+    overlayGroups = c("Provincias", "Félidos")) |> # control de capas
+  addResetMapButton() |> # botón de reinicio
+  addSearchOSM() |> # búsqueda en OSM
+  addMouseCoordinates() |> # coordenadas del puntero del ratón
+  addScaleBar(
+    position = "bottomleft", 
+    options = scaleBarOptions(imperial = FALSE)
+  ) |> # barra de escala
+  addMiniMap(position = "bottomright") |> # mapa de ubicación
+  addFullscreenControl() # mapa de pantalla completa
+```
+
+
+
+
+
+
+
+
+
+
+
+
+# Datos raster
+ 
+```{r}
+#| label: lectura-datos-raster
+
+# Lectura de una capa raster de altitud
+altitud <-
+  rast(
+    "altitud.tif"
+  )
+```
+
+
+```{r}
+#| label: mapa-datos-raster
+
+# Primera capa del mapa (raster)
+plot(
+  altitud,
+  main = "Registros de presencia de félidos en Costa Rica",
+  axes = TRUE,
+  reset = FALSE
+)
+
+
+# Segunda capa (vectorial)
+plot(felidos$geometry,
+     add = TRUE,     
+     pch = 16,
+     col = "green")
+```
+
+
+# Escritura
+
+```{r}
+#| label: escritura-datos-raster
+#| eval: false
+
+# Escritura del objeto altitud
+altitud |>
+  writeRaster("altitud.asc")
+```
+
+
+## Mapeo con leaflet
+
+```{r}
+#| label: mapa-raster-leaflet
+# Paleta de colores de altitud de Costa Rica
+colores_altitud <-
+  colorNumeric(terrain.colors(25), values(altitud), na.color = "transparent")
+leaflet() |>
+  setView(# centro y nivel inicial de acercamiento
+    lng = -84.19452,
+    lat = 9.572735,
+    zoom = 7) |>
+  addTiles(group = "Mapa general (OpenStreetMap)") |>
+  addProviderTiles(providers$Esri.WorldImagery, group = "Imágenes satelitales (ESRI World Imagery)") |>
+  addProviderTiles(providers$OpenTopoMap, group = "Mapa Topográfico") |>
+  addRasterImage(# capa raster
+    altitud,
+    colors = colores_altitud,
+    # paleta de colores
+    opacity = 0.6,
+    group = "Altitud",) |>
+   addLegend(
+    title = "Altitud",
+    values = values(altitud),
+    pal = colores_altitud,
+    position = "bottomleft",
+    group = "Altitud"
+  ) |>
+  addPolygons(
+    # capa de provincias (polígonos)
+    data = provincias,
+    color = "black",
+    fillColor = "transparent",
+    stroke = TRUE,
+    weight = 1.0,
+    group = "Provincias"
+  ) |>
+  addCircleMarkers(
+    # capa de registros de presencia (puntos)
+    data = felidos,
+    stroke = F,
+    radius = 4,
+    fillColor = 'blue',
+    fillOpacity = 1,
+    popup = paste(
+      paste0("<strong>Especie: </strong>", felidos$species),
+      paste0("<strong>Localidad: </strong>", felidos$locality),
+      paste0("<strong>Fecha: </strong>", felidos$eventDate),
+      paste0("<strong>Fuente: </strong>", felidos$institutionCode),
+      paste0("<a href='", felidos$occurrenceID, "'>Más información</a>"),
+      sep = '<br/>'
+    ),
+    group = "Félidos"
+  ) |>
+  addLayersControl(
+    baseGroups = c(
+      "Mapa general (OpenStreetMap)",
+      "Imágenes satelitales (ESRI World Imagery)",
+      "Mapa Topográfico"
+    ),
+    overlayGroups = c("Altitud", "Provincias", "Félidos")
+  ) |> # control de capas
+  addResetMapButton() |> # botón de reinicio
+  addSearchOSM() |> # búsqueda en OSM
+  addMouseCoordinates() |> # coordenadas del puntero del ratón
+  addScaleBar(position = "bottomleft", options = scaleBarOptions(imperial = FALSE)) |> # barra de escala
+  addMiniMap(position = "bottomright") |> # mapa de ubicación
+  addFullscreenControl() # mapa de pantalla completa
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
